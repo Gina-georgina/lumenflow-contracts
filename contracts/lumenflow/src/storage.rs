@@ -18,6 +18,8 @@ pub enum DataKey {
     Multisig(String),
     PaymentRequest(String),
     LargePaymentThreshold,
+    MaxRefundsPerOrder,
+    OrderRefundCount(String),
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
@@ -160,6 +162,31 @@ pub fn set_refund(env: &Env, refund: &RefundRecord) {
         .set(&DataKey::Refund(refund.refund_id.clone()), refund);
 }
 
+pub fn get_max_refunds_per_order(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::MaxRefundsPerOrder)
+        .unwrap_or(5)
+}
+
+pub fn set_max_refunds_per_order(env: &Env, max: u32) {
+    env.storage().instance().set(&DataKey::MaxRefundsPerOrder, &max);
+}
+
+pub fn get_order_refund_count(env: &Env, order_id: &String) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::OrderRefundCount(order_id.clone()))
+        .unwrap_or(0)
+}
+
+pub fn increment_order_refund_count(env: &Env, order_id: &String) {
+    let count = get_order_refund_count(env, order_id) + 1;
+    env.storage()
+        .persistent()
+        .set(&DataKey::OrderRefundCount(order_id.clone()), &count);
+}
+
 // ── Multisig ──────────────────────────────────────────────────────────────────
 
 pub fn get_multisig(env: &Env, payment_id: &String) -> Option<MultisigPayment> {
@@ -191,4 +218,18 @@ pub fn remove_payment_request(env: &Env, request_id: &String) {
     env.storage()
         .temporary()
         .remove(&DataKey::PaymentRequest(request_id.clone()));
+}
+
+// ── Allowed Tokens ────────────────────────────────────────────────────────────
+
+pub fn is_token_allowed(env: &Env, token: &Address) -> bool {
+    env.storage().instance().has(&DataKey::AllowedToken(token.clone()))
+}
+
+pub fn set_token_allowed(env: &Env, token: &Address, allowed: bool) {
+    if allowed {
+        env.storage().instance().set(&DataKey::AllowedToken(token.clone()), &());
+    } else {
+        env.storage().instance().remove(&DataKey::AllowedToken(token.clone()));
+    }
 }
